@@ -1,0 +1,281 @@
+from datetime import date, datetime
+from typing import Any, Generic, TypeVar
+
+from pydantic import BaseModel, Field
+
+T = TypeVar("T")
+
+
+class Paginacao(BaseModel):
+    total: int
+    pagina: int
+    itensPorPagina: int
+
+
+class ApiResponse(BaseModel, Generic[T]):
+    sucesso: bool = True
+    dados: T | None = None
+    erro: str | None = None
+    erros: dict[str, Any] | list[str] | None = None
+    paginacao: Paginacao | None = None
+
+
+def ok(data: Any, paginacao: Paginacao | dict | None = None) -> dict:
+    out: dict[str, Any] = {"sucesso": True, "dados": data}
+    if paginacao:
+        out["paginacao"] = paginacao.model_dump() if hasattr(paginacao, "model_dump") else paginacao
+    return out
+
+
+def fail(msg: str, erros: Any = None) -> dict:
+    out: dict[str, Any] = {"sucesso": False, "erro": msg}
+    if erros is not None:
+        out["erros"] = erros
+    return out
+
+
+# --- Auth ---
+
+class LoginRequest(BaseModel):
+    email: str
+    senha: str
+
+
+class MfaVerifyRequest(BaseModel):
+    temp_token: str
+    codigo: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class UsuarioOut(BaseModel):
+    id: str
+    nome: str
+    email: str
+    role: str
+
+    model_config = {"from_attributes": True}
+
+
+class LoginResponse(BaseModel):
+    mfa_required: bool | None = None
+    temp_token: str | None = None
+    access_token: str | None = None
+    refresh_token: str | None = None
+    usuario: UsuarioOut | None = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
+
+
+# --- Usuarios ---
+
+class UsuarioCreate(BaseModel):
+    nome: str
+    email: str
+    senha: str = Field(min_length=6)
+    role: str
+    cpf: str | None = None
+
+
+# --- Imoveis ---
+
+class ImovelCreate(BaseModel):
+    codigo: str | None = None
+    titulo: str | None = None
+    tipo: str
+    tamanho: str | None = None
+    garagem: bool = False
+    garagem_vagas: int = 0
+    status: str = "disponivel"
+    observacoes: str | None = None
+
+
+class ImovelUpdate(BaseModel):
+    codigo: str | None = None
+    titulo: str | None = None
+    tipo: str | None = None
+    tamanho: str | None = None
+    garagem: bool | None = None
+    garagem_vagas: int | None = None
+    status: str | None = None
+    observacoes: str | None = None
+
+
+class EnderecoCreate(BaseModel):
+    rua: str
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    cidade: str
+    estado: str
+    cep: str | None = None
+
+
+class ComodoOut(BaseModel):
+    id: str
+    imovel_id: str
+    tipo: str
+    descricao: str | None = None
+    nome: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ImovelOut(BaseModel):
+    id: str
+    codigo: str | None = None
+    titulo: str | None = None
+    tipo: str
+    tamanho: str | None = None
+    garagem: bool
+    garagem_vagas: int = 0
+    status: str
+    observacoes: str | None = None
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class EnderecoOut(BaseModel):
+    rua: str
+    logradouro: str | None = None
+    numero: str | None = None
+    complemento: str | None = None
+    bairro: str | None = None
+    cidade: str
+    estado: str
+    cep: str | None = None
+
+
+# --- Contratos ---
+
+class ContratoCreate(BaseModel):
+    imovel_id: str
+    locatario_id: str
+    data_inicio: date
+    data_fim: date
+    valor_mensal: float | None = None
+
+
+class ContratoOut(BaseModel):
+    id: str
+    imovel_id: str
+    locatario_id: str
+    data_inicio: date
+    data_fim: date
+    valor_mensal: float | None = None
+    status: str
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class AgendamentoOut(BaseModel):
+    id: str
+    contrato_id: str
+    tipo: str
+    data_agendada: date | None = None
+    observacao: str | None = None
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# --- Checklists ---
+
+class ChecklistCreate(BaseModel):
+    tipo: str
+    data_vistoria: date | None = None
+    vistoriador_id: str
+
+
+class FotoOut(BaseModel):
+    id: str
+    url: str
+
+
+class ChecklistItemOut(BaseModel):
+    id: str
+    checklist_id: str
+    comodo_id: str
+    item_vistoria_id: str
+    estado: str | None = None
+    observacao: str | None = None
+    fotos: list[FotoOut] = []
+
+
+class ChecklistOut(BaseModel):
+    id: str
+    contrato_id: str
+    vistoriador_id: str
+    tipo: str
+    status: str
+    data_vistoria: date | None = None
+    created_at: datetime | None = None
+    itens: list[ChecklistItemOut] | None = None
+    comodos: list[ComodoOut] | None = None
+
+
+class AddChecklistItemRequest(BaseModel):
+    comodo_id: str
+    item_vistoria_id: str
+    estado: str
+    observacao: str | None = None
+
+
+class ItemUpdateRequest(BaseModel):
+    estado: str | None = None
+    observacao: str | None = None
+
+
+class FotoUploadResponse(BaseModel):
+    id: str
+    url: str
+
+
+class ItemVistoriaOut(BaseModel):
+    id: str
+    nome: str
+    categoria: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# --- Problemas ---
+
+class ProblemaOut(BaseModel):
+    id: str
+    contrato_id: str
+    titulo: str
+    descricao: str | None = None
+    prioridade: str
+    status: str
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+# --- Dashboard / Logs ---
+
+class DashboardOut(BaseModel):
+    imoveis_locados: int
+    checklists_pendentes: int
+    problemas_abertos: int
+    vistorias_agendadas: int
+
+
+class LogOut(BaseModel):
+    id: str
+    usuario_id: str | None = None
+    acao: str
+    entidade: str | None = None
+    entidade_id: str | None = None
+    detalhes: str | None = None
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
