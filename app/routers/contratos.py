@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -13,7 +13,7 @@ from app.models import (
     Problema,
     Usuario,
 )
-from app.schemas import ChecklistCreate, ContratoCreate, fail, ok
+from app.schemas import ChecklistCreate, ContratoCreate, ProblemaCreate, fail, ok
 from app.serializers import (
     log_operacao,
     paginate,
@@ -155,6 +155,53 @@ def create_checklist(
     db.refresh(ck)
     log_operacao(db, user.id, "create", "checklist", ck.id, body.tipo)
     return ok(serialize_checklist(ck))
+
+
+def _assert_pode_problema(contrato: Contrato, user: Usuario) -> None:
+    if user.role in ("admin", "gestor", "vistoriador"):
+        return
+    if user.role == "locatario" and contrato.locatario_id == user.id:
+        return
+    raise HTTPException(status_code=403, detail="Sem permissão para registrar problemas neste contrato")
+
+
+@router.post("/{contrato_id}/problemas")
+def create_problema(
+    contrato_id: str,
+    body: ProblemaCreate,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    ct = db.query(Contrato).filter(Contrato.id == contrato_id).first()
+    if not ct:
+        return fail("Contrato não encontrado")
+    _assert_pode_problema(ct, user)
+
+    if body.prioridade not in ("normal", "alta", "urgente"):
+        return fail("Prioridade inválida")
+    if body.status not in ("aberto", "em_analise", "resolvido", "fechado"):
+        return fail("Status inválido")
+
+    pb = Problema(
+        contrato_id=contrato_id,
+        titulo=body.titulo.strip(),
+        descricao=body.descricao,
+        prioridade=body.prioridade,
+        status=body.status,
+    )
+    db.add(pb)
+    db.commit()
+    db.refresh(pb)
+    log_operacao(db, user.id, "create", "problema", pb.id)
+    return ok({
+        "id": pb.id,
+        "contrato_id": pb.contrato_id,
+        "titulo": pb.titulo,
+        "descricao": pb.descricao,
+        "prioridade": pb.prioridade,
+        "status": pb.status,
+        "created_at": pb.created_at.isoformat() if pb.created_at else None,
+    })
 
 
 @router.get("/{contrato_id}/problemas")

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.config import MAX_UPLOAD_MB, UPLOAD_DIR
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Checklist, ChecklistItem, ChecklistItemFoto, ItemVistoria, Usuario
+from app.models import Checklist, ChecklistItem, ChecklistItemFoto, Contrato, ItemVistoria, Usuario
 from app.schemas import AddChecklistItemRequest, ItemUpdateRequest, fail, ok
 from app.serializers import (
     foto_url,
@@ -35,6 +35,15 @@ def _assert_vistoriador(checklist: Checklist, user: Usuario) -> None:
         return
     if checklist.vistoriador_id != user.id:
         raise HTTPException(status_code=403, detail="Vistoriador não autorizado neste checklist")
+
+
+def _assert_pode_aceitar(checklist: Checklist, user: Usuario, db: Session) -> None:
+    if user.role in ("admin", "gestor"):
+        return
+    contrato = db.query(Contrato).filter(Contrato.id == checklist.contrato_id).first()
+    if user.role == "locatario" and contrato and contrato.locatario_id == user.id:
+        return
+    raise HTTPException(status_code=403, detail="Sem permissão para aceitar ou rejeitar esta vistoria")
 
 
 @router.get("/itens-vistoria")
@@ -243,4 +252,40 @@ def submit_checklist(
     ck.status = "pendente_aceite"
     db.commit()
     log_operacao(db, user.id, "submit", "checklist", checklist_id)
+    return ok({"id": checklist_id, "status": ck.status})
+
+
+@router.patch("/checklists/{checklist_id}/aceitar")
+def aceitar_checklist(
+    checklist_id: str,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    ck = _get_checklist(db, checklist_id)
+    if not ck:
+        return fail("Checklist não encontrado")
+    _assert_pode_aceitar(ck, user, db)
+    if ck.status != "pendente_aceite":
+        return fail("Checklist não está pendente de aceite")
+    ck.status = "aceito"
+    db.commit()
+    log_operacao(db, user.id, "accept", "checklist", checklist_id)
+    return ok({"id": checklist_id, "status": ck.status})
+
+
+@router.patch("/checklists/{checklist_id}/rejeitar")
+def rejeitar_checklist(
+    checklist_id: str,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    ck = _get_checklist(db, checklist_id)
+    if not ck:
+        return fail("Checklist não encontrado")
+    _assert_pode_aceitar(ck, user, db)
+    if ck.status != "pendente_aceite":
+        return fail("Checklist não está pendente de aceite")
+    ck.status = "rejeitado"
+    db.commit()
+    log_operacao(db, user.id, "reject", "checklist", checklist_id)
     return ok({"id": checklist_id, "status": ck.status})

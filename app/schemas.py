@@ -248,6 +248,13 @@ class ItemVistoriaOut(BaseModel):
 
 # --- Problemas ---
 
+class ProblemaCreate(BaseModel):
+    titulo: str
+    descricao: str | None = None
+    prioridade: str = "normal"
+    status: str = "aberto"
+
+
 class ProblemaOut(BaseModel):
     id: str
     contrato_id: str
