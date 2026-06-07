@@ -5,14 +5,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import CORS_ORIGINS, UPLOAD_DIR
-from app.database import Base, engine
-from app.routers import auth_router, checklists, contratos, dashboard, health, imoveis, usuarios
+from app.database import Base, ensure_schema_updates, engine
+from app.routers import admin, auth_router, checklists, contratos, dashboard, health, imoveis, usuarios
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    Base.metadata.create_all(bind=engine)
+    ensure_schema_updates()
     yield
 
 
@@ -40,6 +40,7 @@ app.include_router(imoveis.router, prefix=prefix)
 app.include_router(contratos.router, prefix=prefix)
 app.include_router(checklists.router, prefix=prefix)
 app.include_router(dashboard.router, prefix=prefix)
+app.include_router(admin.router, prefix=prefix)
 
 
 @app.get("/")

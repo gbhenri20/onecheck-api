@@ -8,6 +8,7 @@ from app.models import (
     ChecklistItem,
     ChecklistItemFoto,
     Contrato,
+    Endereco,
     Imovel,
     ImovelComodo,
     ItemVistoria,
@@ -68,8 +69,25 @@ def serialize_checklist(
     return data
 
 
-def serialize_imovel(im: Imovel) -> dict:
+def serialize_endereco(end: Endereco | None) -> dict | None:
+    if not end:
+        return None
     return {
+        "rua": end.rua,
+        "logradouro": end.rua,
+        "numero": end.numero,
+        "complemento": end.complemento,
+        "bairro": end.bairro,
+        "cidade": end.cidade,
+        "estado": end.estado,
+        "cep": end.cep,
+        "latitude": end.latitude,
+        "longitude": end.longitude,
+    }
+
+
+def serialize_imovel(im: Imovel, *, include_endereco: bool = False) -> dict:
+    data = {
         "id": im.id,
         "codigo": im.codigo,
         "titulo": im.titulo,
@@ -81,6 +99,10 @@ def serialize_imovel(im: Imovel) -> dict:
         "observacoes": im.observacoes,
         "created_at": im.created_at.isoformat() if im.created_at else None,
     }
+    if include_endereco:
+        end = im.endereco if hasattr(im, "endereco") else None
+        data["endereco"] = serialize_endereco(end)
+    return data
 
 
 def serialize_contrato(ct: Contrato) -> dict:

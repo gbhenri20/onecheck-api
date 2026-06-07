@@ -23,5 +23,7 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "10"))
 
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
 
+SEED_SECRET = os.getenv("SEED_SECRET", "onecheck-seed-dev")
+
 _cors = os.getenv("CORS_ORIGINS", "*")
 CORS_ORIGINS = ["*"] if _cors.strip() == "*" else [o.strip() for o in _cors.split(",") if o.strip()]

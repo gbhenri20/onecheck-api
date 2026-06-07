@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.config import DATABASE_URL
@@ -26,3 +26,17 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ensure_schema_updates() -> None:
+    """Cria tabelas e adiciona colunas novas em bancos já existentes."""
+    Base.metadata.create_all(bind=engine)
+    insp = inspect(engine)
+    if "enderecos" not in insp.get_table_names():
+        return
+    cols = {c["name"] for c in insp.get_columns("enderecos")}
+    with engine.begin() as conn:
+        if "latitude" not in cols:
+            conn.execute(text("ALTER TABLE enderecos ADD COLUMN latitude FLOAT"))
+        if "longitude" not in cols:
+            conn.execute(text("ALTER TABLE enderecos ADD COLUMN longitude FLOAT"))

@@ -176,7 +176,7 @@ def _populate_sample_data(
     created.append(_create_imovel_com_contrato(
         db, codigo="IM-001", titulo="Apartamento Centro", tipo="Apartamento", tamanho="65m²",
         status_final="locado", locatario_id=loc1.id, vistoriador_id=vist1.id, valor=2500,
-        endereco={"rua": "Rua das Flores", "numero": "100", "bairro": "Centro", "cidade": "São Paulo", "estado": "SP", "cep": "01001000"},
+        endereco={"rua": "Rua das Flores", "numero": "100", "bairro": "Centro", "cidade": "São Paulo", "estado": "SP", "cep": "01001000", "latitude": -23.5505, "longitude": -46.6333},
         checklist_status="em_preenchimento", preencher_itens=True,
         problemas=[{"titulo": "Torneira pingando", "descricao": "Cozinha", "prioridade": "normal", "status": "aberto"}],
     ))
@@ -185,7 +185,7 @@ def _populate_sample_data(
         db, codigo="IM-002", titulo="Casa Jardim América", tipo="Casa", tamanho="120m²",
         status_final="locado", locatario_id=loc_b.id, vistoriador_id=vist_b.id, valor=4200,
         offset_dias=-30,
-        endereco={"rua": "Av. Paulista", "numero": "1500", "bairro": "Bela Vista", "cidade": "São Paulo", "estado": "SP", "cep": "01310100"},
+        endereco={"rua": "Av. Paulista", "numero": "1500", "bairro": "Bela Vista", "cidade": "São Paulo", "estado": "SP", "cep": "01310100", "latitude": -23.5614, "longitude": -46.6559},
         checklist_status="pendente_aceite", preencher_itens=True,
         problemas=[
             {"titulo": "Infiltração no teto", "prioridade": "urgente", "status": "aberto"},
@@ -197,7 +197,7 @@ def _populate_sample_data(
         db, codigo="IM-003", titulo="Studio Moema", tipo="Studio", tamanho="35m²",
         status_final="locado", locatario_id=loc_c.id, vistoriador_id=vist1.id, valor=1800,
         offset_dias=-60,
-        endereco={"rua": "Rua Gaivota", "numero": "200", "bairro": "Moema", "cidade": "São Paulo", "estado": "SP", "cep": "04522000"},
+        endereco={"rua": "Rua Gaivota", "numero": "200", "bairro": "Moema", "cidade": "São Paulo", "estado": "SP", "cep": "04522000", "latitude": -23.6012, "longitude": -46.6643},
         checklist_status="aceito", preencher_itens=True,
     ))
 
@@ -212,12 +212,19 @@ def _populate_sample_data(
         db.add(Endereco(
             imovel_id=im.id, rua=f"Rua {codigo}", numero="50",
             bairro="Vila Mariana", cidade="São Paulo", estado="SP", cep="04101000",
+            latitude=-23.5890 + (0.01 * int(codigo[-1])),
+            longitude=-46.6340 - (0.01 * int(codigo[-1])),
         ))
 
     im6 = Imovel(codigo="IM-006", titulo="Sala Comercial Pinheiros", tipo="Comercial", tamanho="90m²", status="em_vistoria")
     db.add(im6)
     db.flush()
     ensure_default_comodos(db, im6.id)
+    db.add(Endereco(
+        imovel_id=im6.id, rua="Rua dos Pinheiros", numero="800",
+        bairro="Pinheiros", cidade="São Paulo", estado="SP", cep="05422000",
+        latitude=-23.5675, longitude=-46.7033,
+    ))
 
     log_operacao(db, admin.id, "seed", "sistema", None, "Dados de exemplo recriados")
     db.commit()
@@ -396,7 +403,7 @@ def run_expand(db: Session) -> dict:
             db, codigo="IM-002", titulo="Casa Jardim América", tipo="Casa", tamanho="120m²",
             status_final="locado", locatario_id=loc2.id, vistoriador_id=vist2.id, valor=4200,
             offset_dias=-30,
-            endereco={"rua": "Av. Paulista", "numero": "1500", "bairro": "Bela Vista", "cidade": "São Paulo", "estado": "SP", "cep": "01310100"},
+            endereco={"rua": "Av. Paulista", "numero": "1500", "bairro": "Bela Vista", "cidade": "São Paulo", "estado": "SP", "cep": "01310100", "latitude": -23.5614, "longitude": -46.6559},
             checklist_status="pendente_aceite", preencher_itens=True,
             problemas=[{"titulo": "Infiltração no teto", "prioridade": "urgente", "status": "aberto"}],
         ))

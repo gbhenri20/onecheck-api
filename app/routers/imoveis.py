@@ -1,13 +1,34 @@
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import Endereco, Imovel, ImovelComodo, Usuario
 from app.schemas import EnderecoCreate, ImovelCreate, ImovelUpdate, fail, ok
-from app.serializers import ensure_default_comodos, log_operacao, paginate, serialize_comodo, serialize_imovel
+from app.serializers import (
+    ensure_default_comodos,
+    log_operacao,
+    paginate,
+    serialize_comodo,
+    serialize_endereco,
+    serialize_imovel,
+)
 
 router = APIRouter(prefix="/imoveis", tags=["imoveis"])
+
+
+def _apply_endereco(end: Endereco, body: EnderecoCreate, *, is_new: bool) -> None:
+    end.rua = body.rua
+    end.numero = body.numero
+    end.complemento = body.complemento
+    end.bairro = body.bairro
+    end.cidade = body.cidade
+    end.estado = body.estado.upper()
+    end.cep = body.cep
+    if body.latitude is not None or is_new:
+        end.latitude = body.latitude
+    if body.longitude is not None or is_new:
+        end.longitude = body.longitude
 
 
 @router.get("")
@@ -15,15 +36,18 @@ def list_imoveis(
     pagina: int = Query(1, ge=1),
     por_pagina: int = Query(20, ge=1, le=100),
     status: str | None = None,
+    com_endereco: bool = Query(False, description="Inclui endereço com latitude/longitude"),
     db: Session = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ):
     q = db.query(Imovel)
+    if com_endereco:
+        q = q.options(joinedload(Imovel.endereco))
     if status:
         q = q.filter(Imovel.status == status)
     q = q.order_by(Imovel.created_at.desc())
     items, pag = paginate(q, pagina, por_pagina)
-    return ok([serialize_imovel(i) for i in items], pag)
+    return ok([serialize_imovel(i, include_endereco=com_endereco) for i in items], pag)
 
 
 @router.post("")
@@ -52,10 +76,15 @@ def create_imovel(
 
 @router.get("/{imovel_id}")
 def get_imovel(imovel_id: str, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
-    im = db.query(Imovel).filter(Imovel.id == imovel_id).first()
+    im = (
+        db.query(Imovel)
+        .options(joinedload(Imovel.endereco))
+        .filter(Imovel.id == imovel_id)
+        .first()
+    )
     if not im:
         return fail("Imóvel não encontrado")
-    return ok(serialize_imovel(im))
+    return ok(serialize_imovel(im, include_endereco=True))
 
 
 @router.put("/{imovel_id}")
@@ -81,20 +110,13 @@ def get_endereco(imovel_id: str, db: Session = Depends(get_db), _: Usuario = Dep
     end = db.query(Endereco).filter(Endereco.imovel_id == imovel_id).first()
     if not end:
         return fail("Endereço não encontrado")
-    return ok({
-        "rua": end.rua,
-        "logradouro": end.rua,
-        "numero": end.numero,
-        "complemento": end.complemento,
-        "bairro": end.bairro,
-        "cidade": end.cidade,
-        "estado": end.estado,
-        "cep": end.cep,
-    })
+    return ok(serialize_endereco(end))
 
 
 @router.post("/{imovel_id}/endereco")
-def create_endereco(
+@router.put("/{imovel_id}/endereco")
+@router.patch("/{imovel_id}/endereco")
+def upsert_endereco(
     imovel_id: str,
     body: EnderecoCreate,
     db: Session = Depends(get_db),
@@ -106,28 +128,15 @@ def create_endereco(
 
     end = db.query(Endereco).filter(Endereco.imovel_id == imovel_id).first()
     if end:
-        end.rua = body.rua
-        end.numero = body.numero
-        end.complemento = body.complemento
-        end.bairro = body.bairro
-        end.cidade = body.cidade
-        end.estado = body.estado.upper()
-        end.cep = body.cep
+        _apply_endereco(end, body, is_new=False)
     else:
-        end = Endereco(
-            imovel_id=imovel_id,
-            rua=body.rua,
-            numero=body.numero,
-            complemento=body.complemento,
-            bairro=body.bairro,
-            cidade=body.cidade,
-            estado=body.estado.upper(),
-            cep=body.cep,
-        )
+        end = Endereco(imovel_id=imovel_id)
+        _apply_endereco(end, body, is_new=True)
         db.add(end)
     db.commit()
+    db.refresh(end)
     log_operacao(db, user.id, "upsert", "endereco", imovel_id)
-    return ok({"imovel_id": imovel_id})
+    return ok(serialize_endereco(end))
 
 
 @router.get("/{imovel_id}/comodos")

@@ -114,6 +114,8 @@ class EnderecoCreate(BaseModel):
     cidade: str
     estado: str
     cep: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class ComodoOut(BaseModel):
@@ -150,6 +152,8 @@ class EnderecoOut(BaseModel):
     cidade: str
     estado: str
     cep: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 # --- Contratos ---

@@ -80,6 +80,8 @@ class Endereco(Base):
     cidade: Mapped[str] = mapped_column(String(100), nullable=False)
     estado: Mapped[str] = mapped_column(String(2), nullable=False)
     cep: Mapped[str | None] = mapped_column(String(10))
+    latitude: Mapped[float | None] = mapped_column(nullable=True)
+    longitude: Mapped[float | None] = mapped_column(nullable=True)
 
     imovel: Mapped[Imovel] = relationship(back_populates="endereco")
 
