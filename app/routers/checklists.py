@@ -40,9 +40,6 @@ def _assert_vistoriador(checklist: Checklist, user: Usuario) -> None:
 def _assert_pode_aceitar(checklist: Checklist, user: Usuario, db: Session) -> None:
     if user.role in ("admin", "gestor"):
         return
-    contrato = db.query(Contrato).filter(Contrato.id == checklist.contrato_id).first()
-    if user.role == "locatario" and contrato and contrato.locatario_id == user.id:
-        return
     raise HTTPException(status_code=403, detail="Sem permissão para aceitar ou rejeitar esta vistoria")
 
 
@@ -52,11 +49,28 @@ def list_itens_vistoria(db: Session = Depends(get_db), _: Usuario = Depends(get_
     return ok([{"id": r.id, "nome": r.nome, "categoria": r.categoria} for r in rows])
 
 
+def _assert_pode_ver_checklist(checklist: Checklist, user: Usuario, db: Session) -> None:
+    if user.role in ("admin", "gestor", "visualizador"):
+        return
+    if user.role == "vistoriador" and checklist.vistoriador_id == user.id:
+        return
+    if user.role == "locatario":
+        contrato = db.query(Contrato).filter(Contrato.id == checklist.contrato_id).first()
+        if contrato and contrato.locatario_id == user.id:
+            return
+    raise HTTPException(status_code=403, detail="Sem permissão para ver esta vistoria")
+
+
 @router.get("/checklists/{checklist_id}")
-def get_checklist(checklist_id: str, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
+def get_checklist(
+    checklist_id: str,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
     ck = _get_checklist(db, checklist_id)
     if not ck:
         return fail("Checklist não encontrado")
+    _assert_pode_ver_checklist(ck, user, db)
     comodos = get_comodos_for_checklist(db, ck)
     return ok(serialize_checklist(ck, include_itens=True, comodos=comodos))
 

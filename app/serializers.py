@@ -125,6 +125,9 @@ def serialize_usuario(u: Usuario) -> dict:
         "email": u.email,
         "role": u.role,
         "cpf": u.cpf,
+        "mfa_enabled": bool(u.mfa_enabled),
+        "mfa_configurado": bool(u.mfa_secret),
+        "mfa_ativo": bool(u.mfa_enabled and u.mfa_secret),
         "created_at": u.created_at.isoformat() if u.created_at else None,
     }
 

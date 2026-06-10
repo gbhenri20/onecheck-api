@@ -79,18 +79,42 @@ def revoke_refresh_token(db: Session, raw: str) -> None:
 
 
 def needs_mfa(user: Usuario) -> bool:
-    return user.role in MFA_REQUIRED_ROLES and user.mfa_enabled
+    return user.role in MFA_REQUIRED_ROLES and user.mfa_enabled and bool(user.mfa_secret)
+
+
+def mfa_setup_required(user: Usuario) -> bool:
+    return user.role in MFA_REQUIRED_ROLES and user.mfa_enabled and not user.mfa_secret
+
+
+def verify_totp_code(secret: str, codigo: str) -> bool:
+    totp = pyotp.TOTP(secret)
+    return totp.verify(codigo.strip(), valid_window=1)
 
 
 def verify_totp(user: Usuario, codigo: str) -> bool:
     if not user.mfa_secret:
         return False
-    totp = pyotp.TOTP(user.mfa_secret)
-    return totp.verify(codigo, valid_window=1)
+    return verify_totp_code(user.mfa_secret, codigo)
 
 
 def generate_mfa_secret() -> str:
     return pyotp.random_base32()
+
+
+def mfa_provisioning_data(email: str, secret: str) -> dict:
+    import urllib.parse
+
+    totp = pyotp.TOTP(secret)
+    uri = totp.provisioning_uri(name=email, issuer_name="OneCheck")
+    qr_url = (
+        "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data="
+        + urllib.parse.quote(uri, safe="")
+    )
+    return {
+        "secret": secret,
+        "provisioning_uri": uri,
+        "qr_url": qr_url,
+    }
 
 
 def usuario_to_dict(user: Usuario) -> dict:

@@ -46,6 +46,11 @@ class MfaVerifyRequest(BaseModel):
     codigo: str
 
 
+class MfaEnableRequest(BaseModel):
+    secret: str = Field(min_length=16, max_length=64)
+    codigo: str = Field(min_length=6, max_length=6)
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
@@ -80,6 +85,19 @@ class UsuarioCreate(BaseModel):
     senha: str = Field(min_length=6)
     role: str
     cpf: str | None = None
+
+
+class UsuarioUpdateMe(BaseModel):
+    nome: str | None = None
+    senha_atual: str | None = None
+    senha_nova: str | None = Field(default=None, min_length=6)
+
+
+class UsuarioUpdate(BaseModel):
+    nome: str | None = None
+    role: str | None = None
+    senha: str | None = Field(default=None, min_length=6)
+    mfa_enabled: bool | None = None
 
 
 # --- Imoveis ---

@@ -30,9 +30,17 @@ def list_contratos(
     por_pagina: int = Query(20, ge=1, le=100),
     status: str | None = None,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(get_current_user),
 ):
     q = db.query(Contrato)
+    if user.role == "locatario":
+        q = q.filter(Contrato.locatario_id == user.id)
+    elif user.role == "vistoriador":
+        q = (
+            q.join(Checklist, Checklist.contrato_id == Contrato.id)
+            .filter(Checklist.vistoriador_id == user.id)
+            .distinct()
+        )
     if status:
         q = q.filter(Contrato.status == status)
     q = q.order_by(Contrato.created_at.desc())
@@ -102,13 +110,21 @@ def list_agendamentos(contrato_id: str, db: Session = Depends(get_db), _: Usuari
 
 
 @router.get("/{contrato_id}/checklists")
-def list_checklists(contrato_id: str, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
-    rows = (
-        db.query(Checklist)
-        .filter(Checklist.contrato_id == contrato_id)
-        .order_by(Checklist.created_at.desc())
-        .all()
-    )
+def list_checklists(
+    contrato_id: str,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    ct = db.query(Contrato).filter(Contrato.id == contrato_id).first()
+    if not ct:
+        return fail("Contrato não encontrado")
+    if user.role == "locatario" and ct.locatario_id != user.id:
+        return fail("Sem permissão para ver vistorias deste contrato")
+
+    q = db.query(Checklist).filter(Checklist.contrato_id == contrato_id)
+    if user.role == "vistoriador":
+        q = q.filter(Checklist.vistoriador_id == user.id)
+    rows = q.order_by(Checklist.created_at.desc()).all()
     return ok([serialize_checklist(c) for c in rows])
 
 
@@ -205,7 +221,18 @@ def create_problema(
 
 
 @router.get("/{contrato_id}/problemas")
-def list_problemas(contrato_id: str, db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
+def list_problemas(
+    contrato_id: str,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    ct = db.query(Contrato).filter(Contrato.id == contrato_id).first()
+    if not ct:
+        return fail("Contrato não encontrado")
+    try:
+        _assert_pode_problema(ct, user)
+    except HTTPException:
+        return fail("Sem permissão para ver problemas deste contrato")
     rows = (
         db.query(Problema)
         .filter(Problema.contrato_id == contrato_id)

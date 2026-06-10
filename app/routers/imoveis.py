@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import Endereco, Imovel, ImovelComodo, Usuario
+from app.models import Checklist, Contrato, Endereco, Imovel, ImovelComodo, Usuario
 from app.schemas import EnderecoCreate, ImovelCreate, ImovelUpdate, fail, ok
 from app.serializers import (
     ensure_default_comodos,
@@ -38,11 +38,22 @@ def list_imoveis(
     status: str | None = None,
     com_endereco: bool = Query(False, description="Inclui endereço com latitude/longitude"),
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(get_current_user),
 ):
     q = db.query(Imovel)
     if com_endereco:
         q = q.options(joinedload(Imovel.endereco))
+    if user.role == "locatario":
+        sub = db.query(Contrato.imovel_id).filter(Contrato.locatario_id == user.id, Contrato.status == "ativo")
+        q = q.filter(Imovel.id.in_(sub))
+    elif user.role == "vistoriador":
+        sub = (
+            db.query(Contrato.imovel_id)
+            .join(Checklist, Checklist.contrato_id == Contrato.id)
+            .filter(Checklist.vistoriador_id == user.id)
+            .distinct()
+        )
+        q = q.filter(Imovel.id.in_(sub))
     if status:
         q = q.filter(Imovel.status == status)
     q = q.order_by(Imovel.created_at.desc())
