@@ -57,7 +57,7 @@ def create_refresh_token(db: Session, usuario_id: str) -> str:
     token = RefreshToken(
         usuario_id=usuario_id,
         token_hash=_hash_refresh(raw),
-        expires_at=datetime.utcnow() + timedelta(days=JWT_REFRESH_DAYS),
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=JWT_REFRESH_DAYS),
     )
     db.add(token)
     db.commit()
@@ -67,9 +67,9 @@ def create_refresh_token(db: Session, usuario_id: str) -> str:
 def verify_refresh_token(db: Session, raw: str) -> Usuario | None:
     h = _hash_refresh(raw)
     row = db.query(RefreshToken).filter(RefreshToken.token_hash == h).first()
-    if not row or row.expires_at < datetime.utcnow():
+    if not row or row.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         return None
-    return db.query(Usuario).filter(Usuario.id == row.usuario_id, Usuario.ativo == True).first()
+    return db.query(Usuario).filter(Usuario.id == row.usuario_id, Usuario.ativo).first()
 
 
 def revoke_refresh_token(db: Session, raw: str) -> None:
@@ -79,7 +79,9 @@ def revoke_refresh_token(db: Session, raw: str) -> None:
 
 
 def needs_mfa(user: Usuario) -> bool:
-    return user.role in MFA_REQUIRED_ROLES and user.mfa_enabled and bool(user.mfa_secret)
+    return (
+        user.role in MFA_REQUIRED_ROLES and user.mfa_enabled and bool(user.mfa_secret)
+    )
 
 
 def mfa_setup_required(user: Usuario) -> bool:

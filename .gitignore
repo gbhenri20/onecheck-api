@@ -1,0 +1,21 @@
+# Ambiente virtual
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Cobertura de testes
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Banco de dados local
+*.db
+
+# Arquivos de upload (gerados em produção e em testes)
+uploads/
+
+# Plano de testes (documento interno)
+PLANO_TESTES.md
