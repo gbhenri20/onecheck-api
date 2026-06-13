@@ -14,5 +14,8 @@ htmlcov/
 # Banco de dados local
 *.db
 
+# Arquivos de upload (gerados em produção e em testes)
+uploads/
+
 # Plano de testes (documento interno)
 PLANO_TESTES.md

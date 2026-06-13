@@ -10,6 +10,7 @@ Estratégia de isolamento:
 """
 import io
 import os
+import shutil
 
 import bcrypt
 import pyotp
@@ -28,6 +29,7 @@ os.environ["DATABASE_URL"] = _raw_url
 
 # Importações da app somente após definir DATABASE_URL
 from app.main import app  # noqa: E402
+from app.config import UPLOAD_DIR  # noqa: E402
 from app.database import Base, engine as test_engine, get_db  # noqa: E402
 from app.models import (  # noqa: E402
     AgendamentoVistoria,
@@ -80,6 +82,8 @@ def setup_database():
     Base.metadata.create_all(test_engine)
     yield
     Base.metadata.drop_all(test_engine)
+    if UPLOAD_DIR.exists():
+        shutil.rmtree(UPLOAD_DIR)
 
 
 @pytest.fixture
