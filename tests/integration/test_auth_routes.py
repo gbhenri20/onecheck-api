@@ -243,3 +243,100 @@ class TestLogout:
             headers=auth("token.invalido.aqui"),
         )
         assert r.status_code == 401
+
+
+# ── MFA Extended Endpoints (Fase 2) ────────────────────────────────────────────────
+
+class TestMfaExtended:
+    def test_login_com_mfa_setup_required(self, client, db):
+        u = Usuario(
+            nome="Novo Admin",
+            email="novo_admin@test.com",
+            senha_hash=_SENHA_HASH,
+            role="admin",
+            mfa_enabled=True,
+            mfa_secret=None,
+            ativo=True,
+        )
+        db.add(u)
+        db.flush()
+
+        r = client.post("/api/v1/auth/login", json={
+            "email": "novo_admin@test.com",
+            "senha": TEST_SENHA,
+        })
+        data = r.json()
+        assert data["sucesso"] is True
+        assert data["dados"]["mfa_setup_required"] is True
+        assert "temp_token" in data["dados"]
+
+    def test_setup_login_e_activate_login_flow(self, client, db):
+        u = Usuario(
+            nome="Admin Setup",
+            email="admin_setup@test.com",
+            senha_hash=_SENHA_HASH,
+            role="admin",
+            mfa_enabled=True,
+            mfa_secret=None,
+            ativo=True,
+        )
+        db.add(u)
+        db.flush()
+
+        temp_token = create_temp_token(u.id)
+
+        # 1. GET /auth/mfa/setup-login
+        r_setup = client.get(f"/api/v1/auth/mfa/setup-login?temp_token={temp_token}")
+        data_setup = r_setup.json()
+        assert data_setup["sucesso"] is True
+        assert "otpauth_uri" in data_setup["dados"]
+        secret = data_setup["dados"]["secret"]
+        assert secret is not None
+
+        # 2. POST /auth/mfa/activate-login com código válido
+        import pyotp
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+
+        r_act = client.post("/api/v1/auth/mfa/activate-login", json={
+            "temp_token": temp_token,
+            "codigo": code,
+        })
+        data_act = r_act.json()
+        assert data_act["sucesso"] is True
+        assert "access_token" in data_act["dados"]
+        assert data_act["dados"]["usuario"]["email"] == "admin_setup@test.com"
+
+    def test_mfa_setup_e_activate_autenticado(self, client, token_locatario):
+        # 1. GET /auth/mfa/setup
+        r_setup = client.get("/api/v1/auth/mfa/setup", headers=auth(token_locatario))
+        data_setup = r_setup.json()
+        assert data_setup["sucesso"] is True
+        secret = data_setup["dados"]["secret"]
+
+        # 2. POST /auth/mfa/activate
+        import pyotp
+        totp = pyotp.TOTP(secret)
+        code = totp.now()
+
+        r_act = client.post(
+            "/api/v1/auth/mfa/activate",
+            json={"codigo": code},
+            headers=auth(token_locatario),
+        )
+        assert r_act.json()["sucesso"] is True
+
+    def test_mfa_habilitar_e_desabilitar_self(self, client, token_locatario):
+        r_hab = client.post("/api/v1/auth/mfa/habilitar", headers=auth(token_locatario))
+        assert r_hab.json()["sucesso"] is True
+
+        r_des = client.post("/api/v1/auth/mfa/desabilitar", headers=auth(token_locatario))
+        assert r_des.json()["sucesso"] is True
+
+    def test_mfa_disable_admin(self, client, token_admin, user_locatario):
+        r = client.post(
+            "/api/v1/auth/mfa/disable",
+            json={"usuario_id": user_locatario.id},
+            headers=auth(token_admin),
+        )
+        assert r.json()["sucesso"] is True

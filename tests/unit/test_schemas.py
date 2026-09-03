@@ -405,3 +405,65 @@ class TestProblemaCreate:
     def test_status_personalizado(self):
         p = ProblemaCreate(titulo="X", status="em_analise")
         assert p.status == "em_analise"
+
+    def test_comodo_id_e_foto_url(self):
+        p = ProblemaCreate(titulo="X", comodo_id="c-1", foto_url="/uploads/foto.jpg")
+        assert p.comodo_id == "c-1"
+        assert p.foto_url == "/uploads/foto.jpg"
+
+
+# ── Aceite Checklist & Atualização Problema ───────────────────────────────────────
+
+class TestAceiteChecklistSchemas:
+    def test_aceite_checklist_request(self):
+        from app.schemas import AceiteChecklistRequest
+        r = AceiteChecklistRequest(motivo_rejeicao="Pintura descascando")
+        assert r.motivo_rejeicao == "Pintura descascando"
+
+    def test_aceite_checklist_out(self):
+        from app.schemas import AceiteChecklistOut
+        out = AceiteChecklistOut(
+            id="a-1",
+            checklist_id="ck-1",
+            locatario_id="u-1",
+            status="aceito",
+            motivo_rejeicao=None,
+        )
+        assert out.status == "aceito"
+        assert out.id == "a-1"
+
+
+class TestAtualizacaoProblemaSchemas:
+    def test_atualizacao_create(self):
+        from app.schemas import AtualizacaoProblemaCreate
+        a = AtualizacaoProblemaCreate(descricao="Técnico agendado", foto_url="foto.jpg")
+        assert a.descricao == "Técnico agendado"
+        assert a.foto_url == "foto.jpg"
+
+    def test_atualizacao_out(self):
+        from app.schemas import AtualizacaoProblemaOut
+        a = AtualizacaoProblemaOut(
+            id="at-1",
+            problema_id="pb-1",
+            autor_id="u-1",
+            descricao="Resolvido",
+            foto_url=None,
+        )
+        assert a.id == "at-1"
+        assert a.descricao == "Resolvido"
+
+
+class TestLogOutSchema:
+    def test_log_out_com_payload_e_ip(self):
+        from app.schemas import LogOut
+        log = LogOut(
+            id="l-1",
+            acao="create",
+            entidade="imovel",
+            entidade_id="im-1",
+            detalhes="Criado",
+            payload={"tipo": "casa"},
+            ip="127.0.0.1",
+        )
+        assert log.payload == {"tipo": "casa"}
+        assert log.ip == "127.0.0.1"

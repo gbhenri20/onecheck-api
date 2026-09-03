@@ -6,6 +6,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    JSON,
     Numeric,
     String,
     Text,
@@ -62,6 +63,7 @@ class Imovel(Base):
     garagem_vagas: Mapped[int] = mapped_column(default=0)
     status: Mapped[str] = mapped_column(String(50), default="disponivel")
     observacoes: Mapped[str | None] = mapped_column(Text)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     endereco: Mapped["Endereco | None"] = relationship(back_populates="imovel", uselist=False)
@@ -76,12 +78,15 @@ class Endereco(Base):
     rua: Mapped[str] = mapped_column(String(200), nullable=False)
     numero: Mapped[str | None] = mapped_column(String(20))
     complemento: Mapped[str | None] = mapped_column(String(100))
+    bloco: Mapped[str | None] = mapped_column(String(50))
+    andar: Mapped[str | None] = mapped_column(String(50))
     bairro: Mapped[str | None] = mapped_column(String(100))
     cidade: Mapped[str] = mapped_column(String(100), nullable=False)
     estado: Mapped[str] = mapped_column(String(2), nullable=False)
     cep: Mapped[str | None] = mapped_column(String(10))
     latitude: Mapped[float | None] = mapped_column(nullable=True)
     longitude: Mapped[float | None] = mapped_column(nullable=True)
+    ativo: Mapped[bool] = mapped_column(Boolean, default=True)
 
     imovel: Mapped[Imovel] = relationship(back_populates="endereco")
 
@@ -121,7 +126,7 @@ class AgendamentoVistoria(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     contrato_id: Mapped[str] = mapped_column(String(36), ForeignKey("contratos.id"), nullable=False)
     tipo: Mapped[str] = mapped_column(String(50), nullable=False)
-    data_agendada: Mapped[Date | None] = mapped_column(Date)
+    data_agendada: Mapped[datetime | None] = mapped_column(DateTime)
     observacao: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -141,6 +146,21 @@ class Checklist(Base):
 
     contrato: Mapped[Contrato] = relationship(back_populates="checklists")
     itens: Mapped[list["ChecklistItem"]] = relationship(back_populates="checklist", cascade="all, delete-orphan")
+    aceite: Mapped["AceiteChecklist | None"] = relationship(back_populates="checklist", uselist=False, cascade="all, delete-orphan")
+
+
+class AceiteChecklist(Base):
+    __tablename__ = "aceite_checklists"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    checklist_id: Mapped[str] = mapped_column(String(36), ForeignKey("checklists.id"), unique=True, nullable=False)
+    locatario_id: Mapped[str] = mapped_column(String(36), ForeignKey("usuarios.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    motivo_rejeicao: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    checklist: Mapped[Checklist] = relationship(back_populates="aceite")
+    locatario: Mapped[Usuario] = relationship()
 
 
 class ChecklistItem(Base):
@@ -184,13 +204,31 @@ class Problema(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     contrato_id: Mapped[str] = mapped_column(String(36), ForeignKey("contratos.id"), nullable=False)
+    comodo_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("imovel_comodos.id"), nullable=True)
     titulo: Mapped[str] = mapped_column(String(200), nullable=False)
     descricao: Mapped[str | None] = mapped_column(Text)
+    foto_url: Mapped[str | None] = mapped_column(String(500))
     prioridade: Mapped[str] = mapped_column(String(50), default="normal")
     status: Mapped[str] = mapped_column(String(50), default="aberto")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     contrato: Mapped[Contrato] = relationship(back_populates="problemas")
+    comodo: Mapped["ImovelComodo | None"] = relationship()
+    atualizacoes: Mapped[list["AtualizacaoProblema"]] = relationship(back_populates="problema", cascade="all, delete-orphan")
+
+
+class AtualizacaoProblema(Base):
+    __tablename__ = "atualizacoes_problema"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    problema_id: Mapped[str] = mapped_column(String(36), ForeignKey("problemas.id"), nullable=False)
+    autor_id: Mapped[str] = mapped_column(String(36), ForeignKey("usuarios.id"), nullable=False)
+    descricao: Mapped[str] = mapped_column(Text, nullable=False)
+    foto_url: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    problema: Mapped[Problema] = relationship(back_populates="atualizacoes")
+    autor: Mapped[Usuario] = relationship()
 
 
 class LogOperacao(Base):
@@ -202,4 +240,6 @@ class LogOperacao(Base):
     entidade: Mapped[str | None] = mapped_column(String(100))
     entidade_id: Mapped[str | None] = mapped_column(String(36))
     detalhes: Mapped[str | None] = mapped_column(Text)
+    payload: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

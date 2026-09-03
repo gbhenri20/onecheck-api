@@ -3,7 +3,10 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 
 from app.config import PUBLIC_BASE_URL
+from typing import Any
 from app.models import (
+    AceiteChecklist,
+    AtualizacaoProblema,
     Checklist,
     ChecklistItem,
     ChecklistItemFoto,
@@ -13,6 +16,7 @@ from app.models import (
     ImovelComodo,
     ItemVistoria,
     LogOperacao,
+    Problema,
     Usuario,
 )
 
@@ -24,6 +28,45 @@ def foto_url(arquivo: str) -> str:
 
 def serialize_foto(f: ChecklistItemFoto) -> dict:
     return {"id": f.id, "url": foto_url(f.arquivo)}
+
+
+def serialize_aceite(a: AceiteChecklist | None) -> dict | None:
+    if not a:
+        return None
+    return {
+        "id": a.id,
+        "checklist_id": a.checklist_id,
+        "locatario_id": a.locatario_id,
+        "status": a.status,
+        "motivo_rejeicao": a.motivo_rejeicao,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    }
+
+
+def serialize_atualizacao_problema(at: AtualizacaoProblema) -> dict:
+    return {
+        "id": at.id,
+        "problema_id": at.problema_id,
+        "autor_id": at.autor_id,
+        "descricao": at.descricao,
+        "foto_url": at.foto_url,
+        "created_at": at.created_at.isoformat() if at.created_at else None,
+    }
+
+
+def serialize_problema(pb: Problema) -> dict:
+    return {
+        "id": pb.id,
+        "contrato_id": pb.contrato_id,
+        "comodo_id": pb.comodo_id,
+        "titulo": pb.titulo,
+        "descricao": pb.descricao,
+        "foto_url": pb.foto_url,
+        "prioridade": pb.prioridade,
+        "status": pb.status,
+        "created_at": pb.created_at.isoformat() if pb.created_at else None,
+        "atualizacoes": [serialize_atualizacao_problema(a) for a in getattr(pb, "atualizacoes", [])],
+    }
 
 
 def serialize_item(item: ChecklistItem) -> dict:
@@ -61,6 +104,7 @@ def serialize_checklist(
         "status": ck.status,
         "data_vistoria": ck.data_vistoria.isoformat() if ck.data_vistoria else None,
         "created_at": ck.created_at.isoformat() if ck.created_at else None,
+        "aceite": serialize_aceite(ck.aceite) if hasattr(ck, "aceite") and ck.aceite else None,
     }
     if include_itens:
         data["itens"] = [serialize_item(i) for i in ck.itens]
@@ -73,16 +117,18 @@ def serialize_endereco(end: Endereco | None) -> dict | None:
     if not end:
         return None
     return {
-        "rua": end.rua,
-        "logradouro": end.rua,
-        "numero": end.numero,
-        "complemento": end.complemento,
-        "bairro": end.bairro,
-        "cidade": end.cidade,
-        "estado": end.estado,
-        "cep": end.cep,
-        "latitude": end.latitude,
-        "longitude": end.longitude,
+        "rua": getattr(end, "rua", None),
+        "logradouro": getattr(end, "rua", None),
+        "numero": getattr(end, "numero", None),
+        "complemento": getattr(end, "complemento", None),
+        "bloco": getattr(end, "bloco", None),
+        "andar": getattr(end, "andar", None),
+        "bairro": getattr(end, "bairro", None),
+        "cidade": getattr(end, "cidade", None),
+        "estado": getattr(end, "estado", None),
+        "cep": getattr(end, "cep", None),
+        "latitude": getattr(end, "latitude", None),
+        "longitude": getattr(end, "longitude", None),
     }
 
 
@@ -97,6 +143,7 @@ def serialize_imovel(im: Imovel, *, include_endereco: bool = False) -> dict:
         "garagem_vagas": im.garagem_vagas,
         "status": im.status,
         "observacoes": im.observacoes,
+        "ativo": im.ativo if hasattr(im, "ativo") else True,
         "created_at": im.created_at.isoformat() if im.created_at else None,
     }
     if include_endereco:
@@ -149,6 +196,8 @@ def log_operacao(
     entidade: str | None = None,
     entidade_id: str | None = None,
     detalhes: str | None = None,
+    payload: Any = None,
+    ip: str | None = None,
 ) -> None:
     db.add(
         LogOperacao(
@@ -157,6 +206,8 @@ def log_operacao(
             entidade=entidade,
             entidade_id=entidade_id,
             detalhes=detalhes,
+            payload=payload,
+            ip=ip,
         )
     )
     db.commit()

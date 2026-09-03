@@ -51,6 +51,19 @@ class MfaEnableRequest(BaseModel):
     codigo: str = Field(min_length=6, max_length=6)
 
 
+class MfaActivateRequest(BaseModel):
+    codigo: str = Field(min_length=6, max_length=6)
+
+
+class MfaActivateLoginRequest(BaseModel):
+    temp_token: str
+    codigo: str = Field(min_length=6, max_length=6)
+
+
+class MfaDisableRequest(BaseModel):
+    usuario_id: str
+
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
@@ -66,6 +79,7 @@ class UsuarioOut(BaseModel):
 
 class LoginResponse(BaseModel):
     mfa_required: bool | None = None
+    mfa_setup_required: bool | None = None
     temp_token: str | None = None
     access_token: str | None = None
     refresh_token: str | None = None
@@ -128,6 +142,8 @@ class EnderecoCreate(BaseModel):
     rua: str
     numero: str | None = None
     complemento: str | None = None
+    bloco: str | None = None
+    andar: str | None = None
     bairro: str | None = None
     cidade: str
     estado: str
@@ -156,6 +172,7 @@ class ImovelOut(BaseModel):
     garagem_vagas: int = 0
     status: str
     observacoes: str | None = None
+    ativo: bool = True
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
@@ -166,6 +183,8 @@ class EnderecoOut(BaseModel):
     logradouro: str | None = None
     numero: str | None = None
     complemento: str | None = None
+    bloco: str | None = None
+    andar: str | None = None
     bairro: str | None = None
     cidade: str
     estado: str
@@ -201,7 +220,7 @@ class AgendamentoOut(BaseModel):
     id: str
     contrato_id: str
     tipo: str
-    data_agendada: date | None = None
+    data_agendada: datetime | date | None = None
     observacao: str | None = None
     created_at: datetime | None = None
 
@@ -219,6 +238,21 @@ class ChecklistCreate(BaseModel):
 class FotoOut(BaseModel):
     id: str
     url: str
+
+
+class AceiteChecklistOut(BaseModel):
+    id: str
+    checklist_id: str
+    locatario_id: str
+    status: str
+    motivo_rejeicao: str | None = None
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class AceiteChecklistRequest(BaseModel):
+    motivo_rejeicao: str | None = None
 
 
 class ChecklistItemOut(BaseModel):
@@ -241,6 +275,7 @@ class ChecklistOut(BaseModel):
     created_at: datetime | None = None
     itens: list[ChecklistItemOut] | None = None
     comodos: list[ComodoOut] | None = None
+    aceite: AceiteChecklistOut | None = None
 
 
 class AddChecklistItemRequest(BaseModel):
@@ -270,9 +305,27 @@ class ItemVistoriaOut(BaseModel):
 
 # --- Problemas ---
 
+class AtualizacaoProblemaCreate(BaseModel):
+    descricao: str
+    foto_url: str | None = None
+
+
+class AtualizacaoProblemaOut(BaseModel):
+    id: str
+    problema_id: str
+    autor_id: str
+    descricao: str
+    foto_url: str | None = None
+    created_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class ProblemaCreate(BaseModel):
     titulo: str
     descricao: str | None = None
+    comodo_id: str | None = None
+    foto_url: str | None = None
     prioridade: str = "normal"
     status: str = "aberto"
 
@@ -280,11 +333,14 @@ class ProblemaCreate(BaseModel):
 class ProblemaOut(BaseModel):
     id: str
     contrato_id: str
+    comodo_id: str | None = None
     titulo: str
     descricao: str | None = None
+    foto_url: str | None = None
     prioridade: str
     status: str
     created_at: datetime | None = None
+    atualizacoes: list[AtualizacaoProblemaOut] = []
 
     model_config = {"from_attributes": True}
 
@@ -305,6 +361,8 @@ class LogOut(BaseModel):
     entidade: str | None = None
     entidade_id: str | None = None
     detalhes: str | None = None
+    payload: Any | None = None
+    ip: str | None = None
     created_at: datetime | None = None
 
     model_config = {"from_attributes": True}

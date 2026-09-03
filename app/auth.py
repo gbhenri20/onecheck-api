@@ -115,6 +115,7 @@ def mfa_provisioning_data(email: str, secret: str) -> dict:
     return {
         "secret": secret,
         "provisioning_uri": uri,
+        "otpauth_uri": uri,
         "qr_url": qr_url,
     }
 

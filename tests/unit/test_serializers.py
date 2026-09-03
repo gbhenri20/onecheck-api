@@ -470,3 +470,73 @@ def test_get_comodos_for_checklist_ordenados_por_tipo(db, checklist):
     comodos = get_comodos_for_checklist(db, checklist)
     tipos = [c.tipo for c in comodos]
     assert tipos == sorted(tipos)
+
+
+# ── serialize_aceite / atualizacao / problema ─────────────────────────────────────
+
+def test_serialize_aceite_none():
+    from app.serializers import serialize_aceite
+    assert serialize_aceite(None) is None
+
+
+def test_serialize_aceite_campos():
+    from app.serializers import serialize_aceite
+    a = SimpleNamespace(
+        id="ac-1",
+        checklist_id="ck-1",
+        locatario_id="u-1",
+        status="rejeitado",
+        motivo_rejeicao="Itens danificados",
+        created_at=datetime(2026, 1, 1, 10, 0, 0),
+    )
+    res = serialize_aceite(a)
+    assert res["id"] == "ac-1"
+    assert res["status"] == "rejeitado"
+    assert res["motivo_rejeicao"] == "Itens danificados"
+    assert res["created_at"] == "2026-01-01T10:00:00"
+
+
+def test_serialize_atualizacao_problema_campos():
+    from app.serializers import serialize_atualizacao_problema
+    at = SimpleNamespace(
+        id="at-1",
+        problema_id="pb-1",
+        autor_id="u-1",
+        descricao="Equipe enviada",
+        foto_url="foto.png",
+        created_at=datetime(2026, 1, 1, 12, 0, 0),
+    )
+    res = serialize_atualizacao_problema(at)
+    assert res["id"] == "at-1"
+    assert res["descricao"] == "Equipe enviada"
+    assert res["foto_url"] == "foto.png"
+
+
+def test_serialize_problema_com_atualizacoes():
+    from app.serializers import serialize_problema
+    at = SimpleNamespace(
+        id="at-1",
+        problema_id="pb-1",
+        autor_id="u-1",
+        descricao="Equipe enviada",
+        foto_url=None,
+        created_at=datetime(2026, 1, 1, 12, 0, 0),
+    )
+    pb = SimpleNamespace(
+        id="pb-1",
+        contrato_id="ct-1",
+        comodo_id="cm-1",
+        titulo="Infiltração",
+        descricao="Teto úmido",
+        foto_url="/uploads/teto.jpg",
+        prioridade="alta",
+        status="em_andamento",
+        created_at=datetime(2026, 1, 1, 8, 0, 0),
+        atualizacoes=[at],
+    )
+    res = serialize_problema(pb)
+    assert res["id"] == "pb-1"
+    assert res["comodo_id"] == "cm-1"
+    assert res["foto_url"] == "/uploads/teto.jpg"
+    assert len(res["atualizacoes"]) == 1
+    assert res["atualizacoes"][0]["id"] == "at-1"
