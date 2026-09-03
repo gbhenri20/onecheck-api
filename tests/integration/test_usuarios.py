@@ -374,3 +374,88 @@ class TestMfaAdminRoutes:
     def test_locatario_nao_pode_resetar_mfa_de_outro(self, client, user_admin, token_locatario):
         r = client.delete(f"{BASE}/{user_admin.id}/mfa", headers=auth(token_locatario))
         assert r.status_code == 403
+
+    def test_admin_habilita_e_desabilita_mfa_rotas_alternativas(self, client, user_locatario, token_admin):
+        r_hab = client.post(f"{BASE}/{user_locatario.id}/mfa/habilitar", headers=auth(token_admin))
+        assert r_hab.json()["sucesso"] is True
+        assert r_hab.json()["dados"]["mfa_enabled"] is True
+
+        r_des = client.post(f"{BASE}/{user_locatario.id}/mfa/desabilitar", headers=auth(token_admin))
+        assert r_des.json()["sucesso"] is True
+        assert r_des.json()["dados"]["mfa_enabled"] is False
+
+
+# ── PUT /me/senha ─────────────────────────────────────────────────────────────────
+
+class TestAlterarSenhaDedicada:
+    def test_alterar_senha_sucesso(self, client, user_locatario, token_locatario):
+        r = client.put(
+            f"{BASE}/me/senha",
+            json={"senha_atual": TEST_SENHA, "nova_senha": "NovaSenhaFase3@123"},
+            headers=auth(token_locatario),
+        )
+        data = r.json()
+        assert data["sucesso"] is True
+        assert "mensagem" in data["dados"]
+
+    def test_alterar_senha_atual_incorreta(self, client, token_locatario):
+        r = client.put(
+            f"{BASE}/me/senha",
+            json={"senha_atual": "senha_errada", "nova_senha": "NovaSenhaFase3@123"},
+            headers=auth(token_locatario),
+        )
+        data = r.json()
+        assert data["sucesso"] is False
+        assert "incorreta" in data["erro"].lower()
+
+
+# ── DELETE /usuarios/{id} (Soft Delete) ───────────────────────────────────────────
+
+class TestDeleteUsuario:
+    def test_admin_desativa_usuario(self, client, db, token_admin):
+        from app.models import Usuario
+        from tests.conftest import _SENHA_HASH
+        u = Usuario(
+            nome="Para Desativar",
+            email="desativar@test.com",
+            senha_hash=_SENHA_HASH,
+            role="locatario",
+            ativo=True,
+        )
+        db.add(u)
+        db.flush()
+
+        r = client.delete(f"{BASE}/{u.id}", headers=auth(token_admin))
+        assert r.json()["sucesso"] is True
+
+        # Verificar que usuário está inativo no banco
+        db.refresh(u)
+        assert u.ativo is False
+
+    def test_admin_nao_pode_desativar_propria_conta(self, client, user_admin, token_admin):
+        r = client.delete(f"{BASE}/{user_admin.id}", headers=auth(token_admin))
+        data = r.json()
+        assert data["sucesso"] is False
+        assert "própria" in data["erro"].lower()
+
+    def test_desativar_usuario_inexistente(self, client, token_admin):
+        r = client.delete(f"{BASE}/00000000-0000-0000-0000-000000000000", headers=auth(token_admin))
+        assert r.json()["sucesso"] is False
+
+    def test_locatario_nao_pode_desativar_usuario(self, client, user_admin, token_locatario):
+        r = client.delete(f"{BASE}/{user_admin.id}", headers=auth(token_locatario))
+        assert r.status_code == 403
+
+
+# ── Validação de duplicidade de email no PUT ──────────────────────────────────────
+
+class TestUpdateUsuarioEmail:
+    def test_update_email_duplicado_retorna_erro(self, client, user_locatario, user_gestor, token_admin):
+        r = client.put(
+            f"{BASE}/{user_locatario.id}",
+            json={"email": user_gestor.email},
+            headers=auth(token_admin),
+        )
+        data = r.json()
+        assert data["sucesso"] is False
+        assert "já está cadastrado" in data["erro"].lower()

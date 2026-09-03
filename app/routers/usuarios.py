@@ -11,7 +11,15 @@ from app.auth import (
 from app.database import get_db
 from app.deps import get_current_user, require_roles
 from app.models import Usuario
-from app.schemas import MfaEnableRequest, UsuarioCreate, UsuarioUpdate, UsuarioUpdateMe, fail, ok
+from app.schemas import (
+    AlterarSenhaRequest,
+    MfaEnableRequest,
+    UsuarioCreate,
+    UsuarioUpdate,
+    UsuarioUpdateMe,
+    fail,
+    ok,
+)
 from app.serializers import log_operacao, paginate, serialize_usuario
 
 router = APIRouter(prefix="/usuarios", tags=["usuarios"])
@@ -45,6 +53,22 @@ def update_me(
     db.refresh(user)
     log_operacao(db, user.id, "update", "usuario", user.id, "perfil")
     return ok(serialize_usuario(user))
+
+
+@router.put("/me/senha")
+def alterar_senha_me(
+    body: AlterarSenhaRequest,
+    db: Session = Depends(get_db),
+    user: Usuario = Depends(get_current_user),
+):
+    if not verify_password(body.senha_atual, user.senha_hash):
+        return fail("Senha atual incorreta")
+
+    user.senha_hash = hash_password(body.nova_senha)
+    db.commit()
+    db.refresh(user)
+    log_operacao(db, user.id, "update", "usuario", user.id, "alteracao_de_senha")
+    return ok({"mensagem": "Senha alterada com sucesso"})
 
 
 @router.post("/me/mfa/setup")
@@ -120,6 +144,13 @@ def update_usuario(
     user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
     if not user:
         return fail("Usuário não encontrado")
+
+    if body.email is not None and body.email != user.email:
+        existente = db.query(Usuario).filter(Usuario.email == body.email, Usuario.id != usuario_id).first()
+        if existente:
+            return fail("Este e-mail já está cadastrado por outro usuário")
+        user.email = body.email
+
     if body.nome is not None:
         user.nome = body.nome.strip()
     if body.role is not None:
@@ -130,10 +161,30 @@ def update_usuario(
             user.mfa_secret = None
     if body.senha:
         user.senha_hash = hash_password(body.senha)
+
     db.commit()
     db.refresh(user)
     log_operacao(db, current.id, "update", "usuario", user.id)
     return ok(serialize_usuario(user))
+
+
+@router.delete("/{usuario_id}")
+def delete_usuario(
+    usuario_id: str,
+    db: Session = Depends(get_db),
+    current: Usuario = Depends(require_roles("admin", "gestor")),
+):
+    if current.id == usuario_id:
+        return fail("Não é possível desativar a própria conta")
+
+    user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
+    if not user:
+        return fail("Usuário não encontrado")
+
+    user.ativo = False
+    db.commit()
+    log_operacao(db, current.id, "delete", "usuario", user.id, f"email: {user.email}")
+    return ok(None)
 
 
 @router.post("/{usuario_id}/mfa/setup")
@@ -150,18 +201,22 @@ def mfa_setup_usuario(
 
 
 @router.post("/{usuario_id}/mfa/enable")
+@router.post("/{usuario_id}/mfa/habilitar")
 def mfa_enable_usuario(
     usuario_id: str,
-    body: MfaEnableRequest,
+    body: MfaEnableRequest | None = None,
     db: Session = Depends(get_db),
     current: Usuario = Depends(require_roles("admin", "gestor")),
 ):
     user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
     if not user:
         return fail("Usuário não encontrado")
-    if not verify_totp_code(body.secret, body.codigo):
-        return fail("Código MFA inválido")
-    user.mfa_secret = body.secret
+
+    if body and body.codigo:
+        if not verify_totp_code(body.secret, body.codigo):
+            return fail("Código MFA inválido")
+        user.mfa_secret = body.secret
+
     user.mfa_enabled = True
     db.commit()
     db.refresh(user)
@@ -170,6 +225,7 @@ def mfa_enable_usuario(
 
 
 @router.delete("/{usuario_id}/mfa")
+@router.post("/{usuario_id}/mfa/desabilitar")
 def mfa_reset_usuario(
     usuario_id: str,
     db: Session = Depends(get_db),

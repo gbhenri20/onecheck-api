@@ -107,8 +107,14 @@ class UsuarioUpdateMe(BaseModel):
     senha_nova: str | None = Field(default=None, min_length=6)
 
 
+class AlterarSenhaRequest(BaseModel):
+    senha_atual: str
+    nova_senha: str = Field(min_length=6)
+
+
 class UsuarioUpdate(BaseModel):
     nome: str | None = None
+    email: str | None = None
     role: str | None = None
     senha: str | None = Field(default=None, min_length=6)
     mfa_enabled: bool | None = None
