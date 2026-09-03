@@ -290,3 +290,132 @@ class TestListComodos:
     def test_sem_autenticacao_retorna_401(self, client, imovel):
         r = client.get(f"{BASE}/{imovel.id}/comodos")
         assert r.status_code == 401
+
+
+# ── Criação e Atualização Atômica com Endereço ────────────────────────────────────
+
+class TestImovelComEnderecoAtomico:
+    def test_cria_imovel_com_endereco_aninhado(self, client, token_admin):
+        r = client.post(
+            BASE,
+            json={
+                "tipo": "apartamento",
+                "tamanho": "75m²",
+                "endereco": {
+                    "rua": "Av Paulista",
+                    "numero": "1000",
+                    "bloco": "B",
+                    "andar": "10",
+                    "cidade": "São Paulo",
+                    "estado": "SP",
+                    "cep": "01310-100",
+                },
+            },
+            headers=auth(token_admin),
+        )
+        data = r.json()
+        assert data["sucesso"] is True
+        assert "endereco" in data["dados"]
+        assert data["dados"]["endereco"]["rua"] == "Av Paulista"
+        assert data["dados"]["endereco"]["bloco"] == "B"
+        assert data["dados"]["endereco"]["andar"] == "10"
+
+    def test_atualiza_imovel_com_endereco_aninhado(self, client, imovel, token_admin):
+        r = client.put(
+            f"{BASE}/{imovel.id}",
+            json={
+                "tipo": "cobertura",
+                "endereco": {
+                    "rua": "Rua Nova",
+                    "numero": "500",
+                    "cidade": "Curitiba",
+                    "estado": "PR",
+                    "cep": "80000-100",
+                },
+            },
+            headers=auth(token_admin),
+        )
+        data = r.json()
+        assert data["sucesso"] is True
+        assert data["dados"]["tipo"] == "cobertura"
+        assert data["dados"]["endereco"]["rua"] == "Rua Nova"
+
+
+# ── DELETE /imoveis/{id} (Soft Delete) ───────────────────────────────────────────
+
+class TestDeleteImovel:
+    def test_admin_exclui_imovel_sucesso(self, client, db, imovel, token_admin):
+        r = client.delete(f"{BASE}/{imovel.id}", headers=auth(token_admin))
+        assert r.json()["sucesso"] is True
+
+        db.refresh(imovel)
+        assert imovel.ativo is False
+
+    def test_bloqueia_exclusao_imovel_locado(self, client, db, imovel, token_admin):
+        imovel.status = "locado"
+        db.commit()
+
+        r = client.delete(f"{BASE}/{imovel.id}", headers=auth(token_admin))
+        data = r.json()
+        assert data["sucesso"] is False
+        assert "locado" in data["erro"].lower()
+
+    def test_excluir_imovel_inexistente(self, client, token_admin):
+        r = client.delete(f"{BASE}/00000000-0000-0000-0000-000000000000", headers=auth(token_admin))
+        assert r.json()["sucesso"] is False
+
+
+# ── Controle de Acesso por Locatário ─────────────────────────────────────────────
+
+class TestAcessoLocatarioImovel:
+    def test_locatario_sem_contrato_recebe_403_no_get_imovel(self, client, imovel, token_locatario):
+        r = client.get(f"{BASE}/{imovel.id}", headers=auth(token_locatario))
+        assert r.status_code == 403
+
+    def test_locatario_com_contrato_acessa_imovel(self, client, contrato, token_locatario):
+        r = client.get(f"{BASE}/{contrato.imovel_id}", headers=auth(token_locatario))
+        assert r.status_code == 200
+        assert r.json()["sucesso"] is True
+
+
+# ── CRUD Completo de Cômodos ──────────────────────────────────────────────────────
+
+class TestComodosCrud:
+    def test_criar_comodo(self, client, imovel, token_admin):
+        r = client.post(
+            f"{BASE}/{imovel.id}/comodos",
+            json={"tipo": "varanda", "descricao": "Varanda gourmet"},
+            headers=auth(token_admin),
+        )
+        data = r.json()
+        assert data["sucesso"] is True
+        assert data["dados"]["tipo"] == "varanda"
+        assert data["dados"]["descricao"] == "Varanda gourmet"
+
+    def test_atualizar_comodo(self, client, db, imovel, token_admin):
+        from app.models import ImovelComodo
+        c = ImovelComodo(imovel_id=imovel.id, tipo="quarto_antigo")
+        db.add(c)
+        db.commit()
+
+        r = client.put(
+            f"{BASE}/{imovel.id}/comodos/{c.id}",
+            json={"tipo": "suite_master", "descricao": "Com closet"},
+            headers=auth(token_admin),
+        )
+        data = r.json()
+        assert data["sucesso"] is True
+        assert data["dados"]["tipo"] == "suite_master"
+        assert data["dados"]["descricao"] == "Com closet"
+
+    def test_excluir_comodo(self, client, db, imovel, token_admin):
+        from app.models import ImovelComodo
+        c = ImovelComodo(imovel_id=imovel.id, tipo="despensa")
+        db.add(c)
+        db.commit()
+
+        r = client.delete(f"{BASE}/{imovel.id}/comodos/{c.id}", headers=auth(token_admin))
+        assert r.json()["sucesso"] is True
+
+        # Verificar remoção no banco
+        assert db.query(ImovelComodo).filter(ImovelComodo.id == c.id).first() is None

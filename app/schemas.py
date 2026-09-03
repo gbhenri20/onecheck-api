@@ -120,29 +120,7 @@ class UsuarioUpdate(BaseModel):
     mfa_enabled: bool | None = None
 
 
-# --- Imoveis ---
-
-class ImovelCreate(BaseModel):
-    codigo: str | None = None
-    titulo: str | None = None
-    tipo: str
-    tamanho: str | None = None
-    garagem: bool = False
-    garagem_vagas: int = 0
-    status: str = "disponivel"
-    observacoes: str | None = None
-
-
-class ImovelUpdate(BaseModel):
-    codigo: str | None = None
-    titulo: str | None = None
-    tipo: str | None = None
-    tamanho: str | None = None
-    garagem: bool | None = None
-    garagem_vagas: int | None = None
-    status: str | None = None
-    observacoes: str | None = None
-
+# --- Enderecos & Imoveis ---
 
 class EnderecoCreate(BaseModel):
     rua: str
@@ -156,6 +134,42 @@ class EnderecoCreate(BaseModel):
     cep: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+
+
+class ImovelCreate(BaseModel):
+    codigo: str | None = None
+    titulo: str | None = None
+    tipo: str
+    tamanho: str | None = None
+    garagem: bool = False
+    garagem_vagas: int = 0
+    status: str = "disponivel"
+    observacoes: str | None = None
+    endereco: EnderecoCreate | None = None
+
+
+class ImovelUpdate(BaseModel):
+    codigo: str | None = None
+    titulo: str | None = None
+    tipo: str | None = None
+    tamanho: str | None = None
+    garagem: bool | None = None
+    garagem_vagas: int | None = None
+    status: str | None = None
+    observacoes: str | None = None
+    endereco: EnderecoCreate | None = None
+
+
+# --- Comodos ---
+
+class ComodoCreate(BaseModel):
+    tipo: str
+    descricao: str | None = None
+
+
+class ComodoUpdate(BaseModel):
+    tipo: str | None = None
+    descricao: str | None = None
 
 
 class ComodoOut(BaseModel):
