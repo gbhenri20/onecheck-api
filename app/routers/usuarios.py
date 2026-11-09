@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.access import RESUMO_OPERACIONAL
 from app.auth import (
     generate_mfa_secret,
     hash_password,
@@ -112,7 +113,7 @@ def list_usuarios(
     por_pagina: int = Query(20, ge=1, le=100),
     role: str | None = None,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = Depends(require_roles("admin")),
 ):
     q = db.query(Usuario).filter(Usuario.ativo == True)
     if role:
@@ -122,11 +123,35 @@ def list_usuarios(
     return ok([serialize_usuario(u) for u in items], pag)
 
 
+@router.get("/resumo")
+def list_usuarios_resumo(
+    pagina: int = Query(1, ge=1),
+    por_pagina: int = Query(20, ge=1, le=100),
+    role: str | None = None,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(require_roles("admin", "gestor")),
+):
+    """Nomes para distribuir vistorias e contratos, sem e-mail, CPF ou MFA."""
+    if role is not None and role not in RESUMO_OPERACIONAL:
+        return fail("Papel não disponível nesta consulta")
+    q = db.query(Usuario).filter(Usuario.ativo == True)
+    if role:
+        q = q.filter(Usuario.role == role)
+    else:
+        q = q.filter(Usuario.role.in_(RESUMO_OPERACIONAL))
+    q = q.order_by(Usuario.nome)
+    items, pag = paginate(q, pagina, por_pagina)
+    return ok(
+        [{"id": u.id, "nome": u.nome, "role": u.role} for u in items],
+        pag,
+    )
+
+
 @router.get("/{usuario_id}")
 def get_usuario(
     usuario_id: str,
     db: Session = Depends(get_db),
-    current: Usuario = Depends(require_roles("admin", "gestor")),
+    current: Usuario = Depends(require_roles("admin")),
 ):
     user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
     if not user:
@@ -139,7 +164,7 @@ def update_usuario(
     usuario_id: str,
     body: UsuarioUpdate,
     db: Session = Depends(get_db),
-    current: Usuario = Depends(require_roles("admin", "gestor")),
+    current: Usuario = Depends(require_roles("admin")),
 ):
     user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
     if not user:
@@ -172,7 +197,7 @@ def update_usuario(
 def delete_usuario(
     usuario_id: str,
     db: Session = Depends(get_db),
-    current: Usuario = Depends(require_roles("admin", "gestor")),
+    current: Usuario = Depends(require_roles("admin")),
 ):
     if current.id == usuario_id:
         return fail("Não é possível desativar a própria conta")
@@ -191,7 +216,7 @@ def delete_usuario(
 def mfa_setup_usuario(
     usuario_id: str,
     db: Session = Depends(get_db),
-    current: Usuario = Depends(require_roles("admin", "gestor")),
+    current: Usuario = Depends(require_roles("admin")),
 ):
     user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
     if not user:
@@ -206,7 +231,7 @@ def mfa_enable_usuario(
     usuario_id: str,
     body: MfaEnableRequest | None = None,
     db: Session = Depends(get_db),
-    current: Usuario = Depends(require_roles("admin", "gestor")),
+    current: Usuario = Depends(require_roles("admin")),
 ):
     user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
     if not user:
@@ -229,7 +254,7 @@ def mfa_enable_usuario(
 def mfa_reset_usuario(
     usuario_id: str,
     db: Session = Depends(get_db),
-    current: Usuario = Depends(require_roles("admin", "gestor")),
+    current: Usuario = Depends(require_roles("admin")),
 ):
     user = db.query(Usuario).filter(Usuario.id == usuario_id, Usuario.ativo == True).first()
     if not user:
@@ -246,7 +271,7 @@ def mfa_reset_usuario(
 def create_usuario(
     body: UsuarioCreate,
     db: Session = Depends(get_db),
-    current: Usuario = Depends(require_roles("admin", "gestor")),
+    current: Usuario = Depends(require_roles("admin")),
 ):
     if db.query(Usuario).filter(Usuario.email == body.email).first():
         return fail("E-mail já cadastrado")

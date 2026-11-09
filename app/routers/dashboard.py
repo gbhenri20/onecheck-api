@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_current_user, require_roles
+from app.deps import require_roles
 from app.models import (
     AgendamentoVistoria,
     Checklist,
@@ -20,7 +20,7 @@ router = APIRouter(tags=["dashboard"])
 
 
 @router.get("/dashboard")
-def dashboard(db: Session = Depends(get_db), _: Usuario = Depends(get_current_user)):
+def dashboard(db: Session = Depends(get_db), _: Usuario = Depends(require_roles("admin", "gestor"))):
     imoveis_locados = db.query(Imovel).filter(Imovel.status == "locado").count()
     checklists_pendentes = (
         db.query(Checklist)
@@ -48,7 +48,7 @@ def logs(
     de: str | None = None,
     ate: str | None = None,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(require_roles("admin", "gestor")),
+    _: Usuario = Depends(require_roles("admin")),
 ):
     q = db.query(LogOperacao)
     if acao:

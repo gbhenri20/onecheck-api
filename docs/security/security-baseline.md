@@ -25,7 +25,7 @@ O **OneCheck** é um sistema para automação e segurança no fluxo de vistorias
 ## 3. Princípios Adotados e Decisões de Projeto
 
 ### Menor Privilégio
-- **Decisão no Projeto:** Locatários só podem consultar imóveis e laudos vinculados a contratos ativos dos quais são titulares diretos. Endpoints de gerenciamento (criação, edição e exclusão de imóveis, usuários e catálogo de itens) exigem perfil administrativo (`admin` ou `gestor`), com bloqueio por dependência injetada (`require_roles`).
+- **Decisão no Projeto:** Locatários só consultam imóveis e laudos dos próprios contratos. Vistoriadores só consultam imóveis, contratos e laudos em que são o responsável. Imóveis, contratos, agendamentos e ocorrências operacionais exigem `admin` ou `gestor`. Contas, MFA de terceiros e `GET /logs` exigem `admin`. O gestor obtém apenas `id`, `nome` e `role` em `GET /usuarios/resumo`, limitado a vistoriador e locatário.
 - **Controle:** Verificação estrita de RBAC e validação contextual de titularidade no banco antes de retornar qualquer registro.
 
 ### Defesa em Profundidade
@@ -58,7 +58,20 @@ O **OneCheck** é um sistema para automação e segurança no fluxo de vistorias
 
 ---
 
-## 5. Próximos Passos (Roadmap de Segurança)
+## 5. Matriz de permissões
+
+| Operação | admin | gestor | vistoriador | locatario |
+|---|---|---|---|---|
+| `GET/POST/PUT/DELETE /usuarios` e MFA de terceiros | sim | 403 | 403 | 403 |
+| `GET /usuarios/me` e MFA próprio | sim | sim | sim | sim |
+| `GET /usuarios/resumo` | sim | sim, só vistoriador e locatário | 403 | 403 |
+| `GET /logs` | sim | 403 | 403 | 403 |
+| Gravação de log | sim | sim | sim | sim |
+| Imóveis, contratos, agenda e indicadores | sim | sim | só o vínculo próprio | só o próprio contrato |
+| Preencher checklist atribuído | sim | não submete o de outro | só o próprio | não |
+| Ocorrência do próprio contrato | sim | sim | 403 | sim |
+
+## 6. Próximos Passos (Roadmap de Segurança)
 
 1. **Implementação de Rate Limiting:** Adicionar controle de taxa de requisições nos endpoints sensíveis (`/auth/login`, `/auth/mfa/*`) para prevenir ataques de força bruta.
 2. **Armazenamento Seguro de Mídias (S3 com Presigned URLs):** Migrar upload de fotos de vistoria do disco local para bucket em nuvem com URLs assinadas e expiração automática.

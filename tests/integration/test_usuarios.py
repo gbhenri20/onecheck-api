@@ -165,12 +165,9 @@ class TestMfaDisableMe:
 # ── GET /usuarios (listagem) ──────────────────────────────────────────────────────
 
 class TestListUsuarios:
-    def test_lista_usuarios_autenticado(self, client, user_locatario, token_locatario):
+    def test_locatario_nao_lista_usuarios(self, client, user_locatario, token_locatario):
         r = client.get(BASE, headers=auth(token_locatario))
-        data = r.json()
-        assert data["sucesso"] is True
-        assert isinstance(data["dados"], list)
-        assert len(data["dados"]) >= 1
+        assert r.status_code == 403
 
     def test_lista_com_paginacao(self, client, user_admin, token_admin):
         r = client.get(f"{BASE}?pagina=1&por_pagina=5", headers=auth(token_admin))
@@ -200,10 +197,9 @@ class TestGetUsuario:
         assert data["sucesso"] is True
         assert data["dados"]["id"] == user_locatario.id
 
-    def test_gestor_busca_usuario_por_id(self, client, user_locatario, token_gestor):
+    def test_gestor_nao_busca_usuario_por_id(self, client, user_locatario, token_gestor):
         r = client.get(f"{BASE}/{user_locatario.id}", headers=auth(token_gestor))
-        data = r.json()
-        assert data["sucesso"] is True
+        assert r.status_code == 403
 
     def test_locatario_nao_pode_buscar_por_id(self, client, user_admin, token_locatario):
         r = client.get(f"{BASE}/{user_admin.id}", headers=auth(token_locatario))
@@ -285,14 +281,13 @@ class TestCreateUsuario:
         assert data["dados"]["email"] == "novo@test.com"
         assert data["dados"]["role"] == "locatario"
 
-    def test_gestor_cria_usuario(self, client, token_gestor):
+    def test_gestor_nao_cria_usuario(self, client, token_gestor):
         r = client.post(
             BASE,
             json={"nome": "User Gestor", "email": "usergestor@test.com", "senha": "senha123", "role": "locatario"},
             headers=auth(token_gestor),
         )
-        data = r.json()
-        assert data["sucesso"] is True
+        assert r.status_code == 403
 
     def test_email_duplicado_retorna_falha(self, client, user_locatario, token_admin):
         r = client.post(

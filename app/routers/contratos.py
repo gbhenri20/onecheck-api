@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.access import assert_pode_ver_contrato
 from app.config import MAX_UPLOAD_MB, UPLOAD_DIR
 from app.database import get_db
 from app.deps import get_current_user, require_roles
@@ -127,9 +128,7 @@ def get_contrato(
     if not ct:
         return fail("Contrato não encontrado")
 
-    if user.role == "locatario" and ct.locatario_id != user.id:
-        raise HTTPException(status_code=403, detail="Você não tem acesso a este contrato")
-
+    assert_pode_ver_contrato(db, ct, user)
     return ok(serialize_contrato(ct))
 
 
@@ -207,8 +206,7 @@ def list_agendamentos(
     if not ct:
         return fail("Contrato não encontrado")
 
-    if user.role == "locatario":
-        raise HTTPException(status_code=403, detail="Você não tem acesso aos agendamentos deste contrato")
+    assert_pode_ver_contrato(db, ct, user, permitir_locatario=False)
 
     rows = (
         db.query(AgendamentoVistoria)
@@ -267,8 +265,10 @@ def list_checklists(
     ct = db.query(Contrato).filter(Contrato.id == contrato_id).first()
     if not ct:
         return fail("Contrato não encontrado")
-    if user.role == "locatario" and ct.locatario_id != user.id:
-        return fail("Sem permissão para ver vistorias deste contrato")
+    try:
+        assert_pode_ver_contrato(db, ct, user)
+    except HTTPException as e:
+        return fail(e.detail)
 
     q = db.query(Checklist).filter(Checklist.contrato_id == contrato_id)
     if user.role == "vistoriador":
@@ -282,11 +282,19 @@ def create_checklist(
     contrato_id: str,
     body: ChecklistCreate,
     db: Session = Depends(get_db),
-    user: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(require_roles("admin", "gestor")),
 ):
     ct = db.query(Contrato).filter(Contrato.id == contrato_id).first()
     if not ct:
         return fail("Contrato não encontrado")
+
+    vistoriador = db.query(Usuario).filter(
+        Usuario.id == body.vistoriador_id,
+        Usuario.ativo == True,
+        Usuario.role == "vistoriador",
+    ).first()
+    if not vistoriador:
+        return fail("Vistoriador não encontrado")
 
     if body.tipo not in ("inicial", "encerramento"):
         return fail("Tipo deve ser 'inicial' ou 'encerramento'")

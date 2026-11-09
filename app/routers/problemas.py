@@ -35,9 +35,11 @@ def _assert_pode_acessar_problema(pb: Problema, user: Usuario, db: Session) -> C
     contrato = db.query(Contrato).filter(Contrato.id == pb.contrato_id).first()
     if not contrato:
         raise HTTPException(status_code=404, detail="Contrato não encontrado")
-    if user.role == "locatario" and contrato.locatario_id != user.id:
-        raise HTTPException(status_code=403, detail="Você não tem acesso a este problema")
-    return contrato
+    if user.role in ("admin", "gestor"):
+        return contrato
+    if user.role == "locatario" and contrato.locatario_id == user.id:
+        return contrato
+    raise HTTPException(status_code=403, detail="Você não tem acesso a este problema")
 
 
 @router.get("/problemas/{problema_id}")

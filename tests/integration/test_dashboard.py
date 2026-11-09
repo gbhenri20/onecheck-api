@@ -44,9 +44,14 @@ class TestDashboard:
         assert d["imoveis_locados"] >= 1
         assert d["vistorias_agendadas"] >= 2
 
-    def test_qualquer_role_pode_acessar(self, client, token_locatario):
-        r = client.get("/api/v1/dashboard", headers=auth(token_locatario))
+    def test_gestor_acessa_indicadores(self, client, token_gestor):
+        r = client.get("/api/v1/dashboard", headers=auth(token_gestor))
+        assert r.status_code == 200
         assert r.json()["sucesso"] is True
+
+    def test_locatario_nao_acessa_indicadores_globais(self, client, token_locatario):
+        r = client.get("/api/v1/dashboard", headers=auth(token_locatario))
+        assert r.status_code == 403
 
     def test_sem_autenticacao_retorna_401(self, client):
         r = client.get("/api/v1/dashboard")
@@ -119,9 +124,10 @@ class TestLogs:
                 assert "senha_hash" not in p
                 assert "mfa_secret" not in p
 
-    def test_locatario_nao_pode_acessar_logs_retorna_403(self, client, token_locatario):
-        r = client.get("/api/v1/logs", headers=auth(token_locatario))
-        assert r.status_code == 403
+    def test_somente_admin_consulta_logs(self, client, token_gestor, token_vistoriador, token_locatario):
+        for token in (token_gestor, token_vistoriador, token_locatario):
+            r = client.get("/api/v1/logs", headers=auth(token))
+            assert r.status_code == 403
 
     def test_sem_autenticacao_retorna_401(self, client):
         r = client.get("/api/v1/logs")

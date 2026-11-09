@@ -109,7 +109,9 @@ class TestCriarAgendamento:
 
 
 class TestListarAgendamentos:
-    def test_admin_e_vistoriador_listam_agendamentos(self, client, contrato, token_admin, token_vistoriador):
+    def test_admin_e_vistoriador_atribuido_listam_agendamentos(
+        self, client, checklist, contrato, token_admin, token_vistoriador
+    ):
         r_admin = client.get(f"{BASE_CONTRATOS}/{contrato.id}/agendamentos", headers=auth(token_admin))
         assert r_admin.status_code == 200
         assert r_admin.json()["sucesso"] is True
@@ -117,6 +119,10 @@ class TestListarAgendamentos:
         r_vist = client.get(f"{BASE_CONTRATOS}/{contrato.id}/agendamentos", headers=auth(token_vistoriador))
         assert r_vist.status_code == 200
         assert r_vist.json()["sucesso"] is True
+
+    def test_vistoriador_sem_atribuicao_nao_lista_agendamentos(self, client, contrato, token_vistoriador):
+        r = client.get(f"{BASE_CONTRATOS}/{contrato.id}/agendamentos", headers=auth(token_vistoriador))
+        assert r.status_code == 403
 
     def test_locatario_nao_pode_listar_agendamentos(self, client, contrato, token_locatario):
         r = client.get(f"{BASE_CONTRATOS}/{contrato.id}/agendamentos", headers=auth(token_locatario))

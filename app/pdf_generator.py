@@ -145,9 +145,9 @@ def gerar_pdf_checklist(
     canvas.y -= 12
     canvas.add_text(f"Periodo: {contrato.get('data_inicio', '')} ate {contrato.get('data_fim', '')}", "Helvetica", 9, 50)
     canvas.y -= 12
-    canvas.add_text(f"Locatario: {locatario.get('nome', 'N/A')} ({locatario.get('email', 'N/A')})", "Helvetica", 9, 50)
+    canvas.add_text(f"Locatario: {locatario.get('nome', 'N/A')}", "Helvetica", 9, 50)
     canvas.y -= 12
-    canvas.add_text(f"Vistoriador: {vistoriador.get('nome', 'N/A')} ({vistoriador.get('email', 'N/A')})", "Helvetica", 9, 50)
+    canvas.add_text(f"Vistoriador: {vistoriador.get('nome', 'N/A')}", "Helvetica", 9, 50)
     canvas.y -= 20
 
     # Vistoria
